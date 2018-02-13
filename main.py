@@ -1,16 +1,19 @@
-from DAQTasks import * # pylint: disable=W0614
-from flippr import * # pylint: disable=W0614
+from DAQTasks import *  # pylint: disable=W0614
+from flippr import *  # pylint: disable=W0614
 from PyQt5 import QtWidgets, QtCore, QtNetwork
 
 import numpy as np
 
 from QPlot import QPlot
 
-import sys, socket, threading, re
+import sys
+import socket
+import threading
+import re
 
 class SignalServer(QtCore.QObject):
     """Simple implementation of a Qt threaded Python socket server.
-    
+
     Recieves arbitrary TCP packets and scans for keywords. If a packet is recieved
     containing a command corresponding to one of the Qt signals below, this signal is
     emitted and, where necessary, passed a float argument parsed from the incoming
@@ -26,7 +29,7 @@ class SignalServer(QtCore.QObject):
 
         >>thread.started.connect(server.listen)
         >>thread.start()
-    
+
     Attributes:
         toggle (pyqtSignal): Signal to toggle flipper on / off
         comp   (pyqtSignal): Signal to alter compensation coil current
@@ -36,19 +39,19 @@ class SignalServer(QtCore.QObject):
 
     toggle = QtCore.pyqtSignal()
     comp = QtCore.pyqtSignal(float)
-    amp  = QtCore.pyqtSignal(float)
+    amp = QtCore.pyqtSignal(float)
     const = QtCore.pyqtSignal(float)
 
     def __init__(self, host, port):
         super(SignalServer, self).__init__()
-        self.host = host #: Hostname on which to listen
-        self.port = port #: Port on which to listen
-        
+        self.host = host  # : Hostname on which to listen
+        self.port = port  # : Port on which to listen
+
     def listen(self):
         """Listen for incoming connection requests.
-        
+
         This is an extremely standard implementation, see
-        
+
             https://docs.python.org/3/howto/sockets.html
 
         This function is threaded to prevent blocking of the main thread by the while
@@ -57,18 +60,18 @@ class SignalServer(QtCore.QObject):
 
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        sock.bind((self.host,self.port))
-        
+        sock.bind((self.host, self.port))
+
         sock.listen(5)
         while True:
             client, addr = sock.accept()
             client.settimeout(60)
-            thread = threading.Thread(target = self.listenToClient, args=(client,addr))
+            thread = threading.Thread(target=self.listenToClient, args=(client, addr))
             thread.start()
 
     def listenToClient(self, client, addr):
         """Recieve message from accepted connection, parse, and close.
-        
+
         This function is called in a thread to prevent collisions between connections.
         This threaded model is compatible with the Qt signals / slots model through the
         use of QThread.
@@ -91,19 +94,20 @@ class SignalServer(QtCore.QObject):
                     raise Exception('Client disconnected')
 
                 client.close()
-            except:
+            except BaseException:
                 client.close()
                 return False
-        
+
+
 class Flippr(QtWidgets.QMainWindow, Ui_Flippr):
     """Main window implementation
-    
+
     The class functionality can be broadly split into three components: UI, TCPIP server,
     and DAQmx tasks. The UI is bog standard Qt interface stuff, the TCPIP server is
     itself documented above and then run inside a QThread, see
 
         https://mayaposch.wordpress.com/2011/11/01/how-to-really-truly-use-qthreads-the-full-explanation/,
-    
+
     and the DAQmx tasks are started / stopped by calling onoff() alongside a simple state
     flag that tracks if the flipper is currently on or off. See DAQTasks.py for detail
     on the functionality of each task.
@@ -122,8 +126,8 @@ class Flippr(QtWidgets.QMainWindow, Ui_Flippr):
         self.pulseOutput.setGeometry(QtCore.QRect(410, 10, 211, 161))
         self.pulseOutput.setObjectName("pulseOutput")
 
-        self.running = 0 # Important state flag, 0 = flipper off, 1 = flipper on. This
-                         # should ONLY be adjusted by the onoff() function
+        self.running = 0  # Important state flag, 0 = flipper off, 1 = flipper on. This
+        # should ONLY be adjusted by the onoff() function
 
         self.on_button.clicked.connect(self.onoff)
 
@@ -151,11 +155,11 @@ class Flippr(QtWidgets.QMainWindow, Ui_Flippr):
     def const(self, amp):
         """Adjusts the decay constant for the flipper current"""
         turnbackon = 0
-        
+
         if self.running == 1:
             self.onoff()
             turnbackon = 1
-        
+
         self.decay_spin.setValue(amp)
 
         if turnbackon == 1:
@@ -164,11 +168,11 @@ class Flippr(QtWidgets.QMainWindow, Ui_Flippr):
     def amplitude(self, amp):
         """Adjusts the maximum allowed amplitude for the flipper current"""
         turnbackon = 0
-        
+
         if self.running == 1:
             self.onoff()
             turnbackon = 1
-        
+
         self.amplitude_spin.setValue(amp)
 
         if turnbackon == 1:
@@ -177,11 +181,11 @@ class Flippr(QtWidgets.QMainWindow, Ui_Flippr):
     def compensate(self, amp):
         """Adjusts the compensation current"""
         turnbackon = 0
-        
+
         if self.running == 1:
             self.onoff()
             turnbackon = 1
-        
+
         self.comp_spin.setValue(amp)
 
         if turnbackon == 1:
@@ -207,8 +211,9 @@ class Flippr(QtWidgets.QMainWindow, Ui_Flippr):
             self.atask = AnalogTask(self.decay_spin.value(),
                                     self.amplitude_spin.value())    # Analog signal output
 
-            self.pulseOutput.plot_figure(np.arange(len(self.atask.write)),self.atask.write)
-            
+            self.pulseOutput.plot_figure(
+                np.arange(len(self.atask.write)), self.atask.write)
+
             self.rtask = ReadbackTask()  # Read task for diagnostics
 
             self.atask.StartTask()
@@ -219,9 +224,9 @@ class Flippr(QtWidgets.QMainWindow, Ui_Flippr):
             #########################################
 
             self.running_indicator.setText("RUNNING")
-            
+
             def updateUi():
-                self.freq_lineedit.setText(str(round(self.rtask.freq,3)))
+                self.freq_lineedit.setText(str(round(self.rtask.freq, 3)))
                 self.missed_lineedit.setText(str(self.rtask.missed))
 
             self.uiClock = QtCore.QTimer(self)
@@ -233,8 +238,8 @@ class Flippr(QtWidgets.QMainWindow, Ui_Flippr):
         else:
             self.atask.ClearTask()
             self.rtask.ClearTask()
-            #self.ctask.ClearTask()
-            
+            # self.ctask.ClearTask()
+
             self.uiClock.stop()
             self.running_indicator.setText("NOT RUNNING")
             ZeroOutput()
@@ -245,5 +250,5 @@ if __name__ == '__main__':
     aw = Flippr()
 
     aw.show()
-    app.aboutToQuit.connect(ZeroOutput) # Make sure current is always zeroed when we exit
+    app.aboutToQuit.connect(ZeroOutput)  # Make sure current is always zeroed when we exit
     sys.exit(app.exec_())
