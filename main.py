@@ -39,7 +39,7 @@ class SignalServer(QtCore.QObject):
         const  (pyqtSignal): Signal to alter the time constant of the flipping current
     """
 
-    toggle = QtCore.pyqtSignal()
+    toggle = QtCore.pyqtSignal(int)
     comp = QtCore.pyqtSignal(float)
     amp = QtCore.pyqtSignal(float)
     const = QtCore.pyqtSignal(float)
@@ -95,7 +95,12 @@ class SignalServer(QtCore.QObject):
                     data = str(data,'utf-8').replace(" ","")
                     self.fn.emit(data.replace("file",""))
                 if data and "toggle" in str(data):
-                    self.toggle.emit()
+                    if "1" in str(data):
+                        self.toggle.emit(1)
+                    elif "0" in str(data):
+                        self.toggle.emit(0)
+                    else:
+                        self.toggle.emit(-1)
                 else:
                     raise Exception('Client disconnected')
 
@@ -164,9 +169,14 @@ class Flippr(QtWidgets.QMainWindow, Ui_Flippr):
         self.filename = filename
         self.filename_lineedit.setText(filename)
 
-    def toggle(self):
+    def toggle(self, flag):
         """Currently just a wrapper for onoff(), kept for future"""
-        self.onoff()
+        if flag == 1:
+            self.on()
+        elif flag == 0:
+            self.off()
+        else:
+            self.onoff()
 
     def const(self, amp):
         """Adjusts the decay constant for the flipper current"""
