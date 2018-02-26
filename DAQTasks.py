@@ -1,6 +1,7 @@
 from PyDAQmx import *  # pylint: disable=W0614
 import numpy as np
-from time import time
+from time import time, sleep
+import os
 
 """PyDAQmx provides an OOP wrapper to the DAQmx C Library. All commands
 parallel their C equivalent one to one. For documentation on the functionality
@@ -15,44 +16,39 @@ SAMPRATE = 1e6  # Define a sampling rate such that 1 sample = 1 microsecond
 def ZeroOutput():
     """Sets all the analog output channels of the DAQ card to 0V"""
 
-    task = Task()
+    for chan in ["dev1/ao0", "dev1/ao1"]:
+        sleep(1)
 
-    wrote = int32()
+        task = Task()
 
-    task.CreateAOVoltageChan("dev1/ao0",
-                             "",
-                             0, 10,
-                             DAQmx_Val_Volts,  # pylint: disable=E0602
-                             None
-                             )
+        wrote = int32()
 
-    task.CreateAOVoltageChan("dev1/ao1",
-                             "",
-                             0, 10,
-                             DAQmx_Val_Volts,  # pylint: disable=E0602
-                             None
-                             )
+        task.CreateAOVoltageChan(chan,
+                                 "",
+                                 0, 10,
+                                 DAQmx_Val_Volts,  # pylint: disable=E0602
+                                 None
+                                 )
 
-    task.CfgSampClkTiming("",
-                          5e4,
-                          DAQmx_Val_Rising,      # pylint: disable=E0602
-                          DAQmx_Val_FiniteSamps,  # pylint: disable=E0602
-                          2
-                          )
+        task.CfgSampClkTiming("",
+                              5e4,
+                              DAQmx_Val_Rising,      # pylint: disable=E0602
+                              DAQmx_Val_FiniteSamps,  # pylint: disable=E0602
+                              2
+                              )
 
-    task.WriteAnalogF64(2,
-                        False,
-                        1e-2,
-                        DAQmx_Val_GroupByChannel,  # pylint: disable=E0602
-                        np.array(
-                            [0.0], dtype=np.float64),  # pylint: disable=E1101
-                        wrote,
-                        None
-                        )
+        task.WriteAnalogF64(2,
+                            False,
+                            1e-2,
+                            DAQmx_Val_GroupByChannel,  # pylint: disable=E0602
+                            np.array(
+                                [0.0], dtype=np.float64),  # pylint: disable=E1101
+                            wrote,
+                            None
+                            )
 
-    task.StartTask()
-
-    task.ClearTask()
+        task.StartTask()
+        task.ClearTask()
 
 
 class AnalogTask(Task):
@@ -65,19 +61,17 @@ class AnalogTask(Task):
     the functional form we want.
     """
 
-    def __init__(self, lamb, amplitude):
+    def __init__(self, const, amplitude, waveform_fn = None):
         Task.__init__(self)
 
-        t = np.linspace(1e-6, 50e-3, num=50e3)  # Time values from 0 to 50ms
+        if waveform_fn and os.path.isfile(os.path.join(os.getcwd(), waveform_fn)):
+            self.write = np.loadtxt(waveform_fn, unpack=True)
+        else:
+            t = np.linspace(1e-6, 100e-3, num=100e3)  # Time values from 0 to 50ms
+            self.write = const / (t)
 
-        self.write = lamb / (t)
-        # Modulate the amplitude
-        self.write[np.where(self.write > amplitude)] = amplitude
-        # Write a zero at the end of
-        self.write = np.append(self.write, [self.write[0]])
-        # the buffer to prevent
-        # driving a constant current
-        # between cycles.
+            # Modulate the amplitude
+            self.write[np.where(self.write > amplitude)] = amplitude
 
         wrote = int32()
 

@@ -2,7 +2,7 @@
 
 # Form implementation generated from reading ui file '.\flippr.ui'
 #
-# Created by: PyQt5 UI code generator 5.10
+# Created by: PyQt5 UI code generator 5.9
 #
 # WARNING! All changes made in this file will be lost!
 
@@ -77,6 +77,10 @@ class Ui_Flippr(object):
         self.frequency_label = QtWidgets.QLabel(self.gridLayoutWidget)
         self.frequency_label.setObjectName("frequency_label")
         self.diagnostics_layout.addWidget(self.frequency_label, 0, 0, 1, 1)
+        self.missed_lineedit = QtWidgets.QLineEdit(self.gridLayoutWidget)
+        self.missed_lineedit.setEnabled(False)
+        self.missed_lineedit.setObjectName("missed_lineedit")
+        self.diagnostics_layout.addWidget(self.missed_lineedit, 1, 1, 1, 1)
         self.freq_lineedit = QtWidgets.QLineEdit(self.gridLayoutWidget)
         self.freq_lineedit.setEnabled(False)
         self.freq_lineedit.setClearButtonEnabled(False)
@@ -85,10 +89,13 @@ class Ui_Flippr(object):
         self.missed_label = QtWidgets.QLabel(self.gridLayoutWidget)
         self.missed_label.setObjectName("missed_label")
         self.diagnostics_layout.addWidget(self.missed_label, 1, 0, 1, 1)
-        self.missed_lineedit = QtWidgets.QLineEdit(self.gridLayoutWidget)
-        self.missed_lineedit.setEnabled(False)
-        self.missed_lineedit.setObjectName("missed_lineedit")
-        self.diagnostics_layout.addWidget(self.missed_lineedit, 1, 1, 1, 1)
+        self.filename_label = QtWidgets.QLabel(self.gridLayoutWidget)
+        self.filename_label.setObjectName("filename_label")
+        self.diagnostics_layout.addWidget(self.filename_label, 2, 0, 1, 1)
+        self.filename_lineedit = QtWidgets.QLineEdit(self.gridLayoutWidget)
+        self.filename_lineedit.setEnabled(False)
+        self.filename_lineedit.setObjectName("filename_lineedit")
+        self.diagnostics_layout.addWidget(self.filename_lineedit, 2, 1, 1, 1)
         self.pulseOutput = QtWidgets.QWidget(self.centralwidget)
         self.pulseOutput.setGeometry(QtCore.QRect(410, 10, 211, 161))
         self.pulseOutput.setObjectName("pulseOutput")
@@ -116,4 +123,5 @@ class Ui_Flippr(object):
         self.diagnostics_box.setTitle(_translate("Flippr", "Diagnostics"))
         self.frequency_label.setText(_translate("Flippr", "Frequency"))
         self.missed_label.setText(_translate("Flippr", "Missed"))
+        self.filename_label.setText(_translate("Flippr", "Filename"))
 

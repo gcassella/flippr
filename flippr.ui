@@ -166,6 +166,13 @@
         </property>
        </widget>
       </item>
+      <item row="1" column="1">
+       <widget class="QLineEdit" name="missed_lineedit">
+        <property name="enabled">
+         <bool>false</bool>
+        </property>
+       </widget>
+      </item>
       <item row="0" column="1">
        <widget class="QLineEdit" name="freq_lineedit">
         <property name="enabled">
@@ -183,8 +190,15 @@
         </property>
        </widget>
       </item>
-      <item row="1" column="1">
-       <widget class="QLineEdit" name="missed_lineedit">
+      <item row="2" column="0">
+       <widget class="QLabel" name="filename_label">
+        <property name="text">
+         <string>Filename</string>
+        </property>
+       </widget>
+      </item>
+      <item row="2" column="1">
+       <widget class="QLineEdit" name="filename_lineedit">
         <property name="enabled">
          <bool>false</bool>
         </property>

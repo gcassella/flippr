@@ -11,6 +11,8 @@ import socket
 import threading
 import re
 
+from time import sleep
+
 class SignalServer(QtCore.QObject):
     """Simple implementation of a Qt threaded Python socket server.
 
@@ -41,6 +43,7 @@ class SignalServer(QtCore.QObject):
     comp = QtCore.pyqtSignal(float)
     amp = QtCore.pyqtSignal(float)
     const = QtCore.pyqtSignal(float)
+    fn = QtCore.pyqtSignal(str)
 
     def __init__(self, host, port):
         super(SignalServer, self).__init__()
@@ -88,6 +91,9 @@ class SignalServer(QtCore.QObject):
                     self.amp.emit(float(re.findall(r"[-+]?\d*\.\d+|\d+", str(data))[0]))
                 if data and "const" in str(data):
                     self.const.emit(float(re.findall(r"[-+]?\d*\.\d+|\d+", str(data))[0]))
+                if data and "file" in str(data):
+                    data = str(data,'utf-8').replace(" ","")
+                    self.fn.emit(data.replace("file",""))
                 if data and "toggle" in str(data):
                     self.toggle.emit()
                 else:
@@ -132,7 +138,7 @@ class Flippr(QtWidgets.QMainWindow, Ui_Flippr):
         self.on_button.clicked.connect(self.onoff)
 
         # Set up TCPIP server to recieve OpenGENIE commands
-        self.server = SignalServer('NDW1889', 80)
+        self.server = SignalServer('', 80)
         self.serverThread = QtCore.QThread()
         self.server.moveToThread(self.serverThread)
 
@@ -140,13 +146,23 @@ class Flippr(QtWidgets.QMainWindow, Ui_Flippr):
         self.server.comp.connect(self.compensate)
         self.server.amp.connect(self.amplitude)
         self.server.const.connect(self.const)
+        self.server.fn.connect(self.fn)
 
         self.serverThread.started.connect(self.server.listen)
         self.serverThread.start()
 
+        # Waveform filename, no file if filename=""
+
+        self.filename=""
+
     ##########################
     # OpenGENIE signal slots #
     ##########################
+
+    def fn(self, filename):
+        """Sets the filename to read waveform from"""
+        self.filename = filename
+        self.filename_lineedit.setText(filename)
 
     def toggle(self):
         """Currently just a wrapper for onoff(), kept for future"""
@@ -195,6 +211,11 @@ class Flippr(QtWidgets.QMainWindow, Ui_Flippr):
 
     def onoff(self):
         if self.running == 0:
+
+            self.atask = AnalogTask(self.decay_spin.value(),
+                                    self.amplitude_spin.value(),
+                                    self.filename)    # Analog signal output
+
             ############################
             # Set up compensation coil #
             ############################
@@ -208,8 +229,7 @@ class Flippr(QtWidgets.QMainWindow, Ui_Flippr):
             # Start triggering flipping coil #
             ##################################
 
-            self.atask = AnalogTask(self.decay_spin.value(),
-                                    self.amplitude_spin.value())    # Analog signal output
+
 
             self.pulseOutput.plot_figure(
                 np.arange(len(self.atask.write)), self.atask.write)
@@ -238,11 +258,12 @@ class Flippr(QtWidgets.QMainWindow, Ui_Flippr):
         else:
             self.atask.ClearTask()
             self.rtask.ClearTask()
-            # self.ctask.ClearTask()
 
             self.uiClock.stop()
             self.running_indicator.setText("NOT RUNNING")
+
             ZeroOutput()
+
             self.running = 0
 
 if __name__ == '__main__':
