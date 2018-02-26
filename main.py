@@ -219,6 +219,66 @@ class Flippr(QtWidgets.QMainWindow, Ui_Flippr):
 
     ##########################
 
+    def on(self):
+        if self.running == 0:
+            ############################
+            # Set up compensation coil #
+            ############################
+
+            self.cmptask = CompensationTask(self.comp_spin.value())
+
+            self.cmptask.StartTask()
+            self.cmptask.ClearTask()
+
+            ##################################
+            # Start triggering flipping coil #
+            ##################################
+
+            self.atask = AnalogTask(self.decay_spin.value(),
+                                    self.amplitude_spin.value(),
+                                    self.filename)    # Analog signal output
+
+            self.pulseOutput.plot_figure(
+                np.arange(len(self.atask.write)), self.atask.write)
+
+            self.rtask = ReadbackTask()  # Read task for diagnostics
+
+            self.atask.StartTask()
+            self.rtask.StartTask()
+
+            #########################################
+            # Hook up some purely cosmetic UI stuff #
+            #########################################
+
+            self.running_indicator.setText("RUNNING")
+
+            def updateUi():
+                self.freq_lineedit.setText(str(round(self.rtask.freq, 3)))
+                self.missed_lineedit.setText(str(self.rtask.missed))
+
+            self.uiClock = QtCore.QTimer(self)
+            self.uiClock.setInterval(1000)
+            self.uiClock.timeout.connect(updateUi)
+            self.uiClock.start()
+
+            self.running = 1
+        else:
+            pass
+
+    def off(self):
+        if self.running == 1:
+            self.atask.ClearTask()
+            self.rtask.ClearTask()
+
+            self.uiClock.stop()
+            self.running_indicator.setText("NOT RUNNING")
+
+            ZeroOutput()
+
+            self.running = 0
+        else:
+            pass
+
     def onoff(self):
         if self.running == 0:
 
