@@ -212,10 +212,6 @@ class Flippr(QtWidgets.QMainWindow, Ui_Flippr):
     def onoff(self):
         if self.running == 0:
 
-            self.atask = AnalogTask(self.decay_spin.value(),
-                                    self.amplitude_spin.value(),
-                                    self.filename)    # Analog signal output
-
             ############################
             # Set up compensation coil #
             ############################
@@ -229,7 +225,9 @@ class Flippr(QtWidgets.QMainWindow, Ui_Flippr):
             # Start triggering flipping coil #
             ##################################
 
-
+            self.atask = AnalogTask(self.decay_spin.value(),
+                                    self.amplitude_spin.value(),
+                                    self.filename)    # Analog signal output
 
             self.pulseOutput.plot_figure(
                 np.arange(len(self.atask.write)), self.atask.write)
