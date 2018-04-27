@@ -166,6 +166,8 @@ class ReadbackTask(Task):
     blocks outside the timing window of each task run. Currently the task is simply timing
     the triggering using a callback to ensure no timing pulses are being missed. To do
     this it is not even necessary to connect a signal to the input terminal.
+
+    Currently we are only using this task to monitor for the beam turning off.
     """
 
     def __init__(self):
@@ -181,9 +183,7 @@ class ReadbackTask(Task):
         """DAQmx procedure:
 
         1) Create Analog Input channel.
-        2) Configure Sample Clock to time a sample every microsecond and read a 50% duty
-           cycle at 10Hz. This is, as of writing, the timing signal frequency for TS2 at
-           ISIS and the duty cycle for which we write samples to the flipper.
+        2) Configure Sample Clock to time N samples
         3) Register a callback function every time we have finished reading samples to
            handle the data / do any timing we want.
         4) Set the task to be retriggerable.
