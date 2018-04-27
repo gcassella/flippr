@@ -67,11 +67,14 @@ class AnalogTask(Task):
         if waveform_fn and os.path.isfile(os.path.join(os.getcwd(), waveform_fn)):
             self.write = np.loadtxt(waveform_fn, unpack=True)
         else:
-            t = np.linspace(1e-6, 100e-3, num=100e3)  # Time values from 0 to 50ms
+            t = np.linspace(1e-6, 92.5e-3, num=92.5e3)  # Time values from 0 to 100ms
             self.write = const / (t)
 
             # Modulate the amplitude
             self.write[np.where(self.write > amplitude)] = amplitude
+
+            padding = np.ones((int(7.25e3),))*amplitude
+            self.write = np.concatenate((self.write, padding))
 
         wrote = int32()
 
@@ -171,7 +174,7 @@ class ReadbackTask(Task):
         self.i = 0
         self.freq = 0
         self.missed = 0
-        self.data = np.zeros(int(50e3))
+        self.data = np.zeros(int(50))
         self.time = time()
         self.sum_delta_t = 0
 
@@ -198,10 +201,10 @@ class ReadbackTask(Task):
                               SAMPRATE,
                               DAQmx_Val_Rising,       # pylint: disable=E0602
                               DAQmx_Val_FiniteSamps,  # pylint: disable=E0602
-                              int(50e3))
+                              int(50))
 
         self.AutoRegisterEveryNSamplesEvent(DAQmx_Val_Acquired_Into_Buffer,  # pylint: disable=E0602
-                                            int(50e3),
+                                            int(50),
                                             0)
 
         self.CfgAnlgEdgeStartTrig("APFI0",
@@ -222,23 +225,4 @@ class ReadbackTask(Task):
                            read,
                            None)
 
-        t = time()                        # Mark the current time and calculate the time
-        self.sum_delta_t += t - self.time  # delta since the last cycle.
-
-        """Every ten cycles calculate the average frequency of the cycles over those ten
-        and compare that value to 10Hz. If the frequency deviates from 10Hz by more
-        than 10%, we mark that we missed a tick somewhere in that packet.
-        """
-
-        if self.i % 10 == 0 and self.i > 0:
-            self.freq = self.i / self.sum_delta_t
-
-            self.sum_delta_t = 0
-            self.i = 0
-
-            if (np.abs(self.freq - 10) > 0.1):
-                self.missed += 1
-        self.i += 1
-        self.time = t
-
-        return 0
+        self.time = time()

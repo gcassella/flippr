@@ -11,7 +11,7 @@ import socket
 import threading
 import re
 
-from time import sleep
+from time import time, sleep
 
 class SignalServer(QtCore.QObject):
     """Simple implementation of a Qt threaded Python socket server.
@@ -45,10 +45,11 @@ class SignalServer(QtCore.QObject):
     const = QtCore.pyqtSignal(float)
     fn = QtCore.pyqtSignal(str)
 
-    def __init__(self, host, port):
+    def __init__(self, host, port, parent=None):
         super(SignalServer, self).__init__()
-        self.host = host  # : Hostname on which to listen
-        self.port = port  # : Port on which to listen
+        self.host = host        # : Hostname on which to listen
+        self.port = port        # : Port on which to listen
+        self.parent = parent    # Need a hook to the main class to retrieve settings
 
     def listen(self):
         """Listen for incoming connection requests.
@@ -86,14 +87,26 @@ class SignalServer(QtCore.QObject):
                 data = client.recv(size)
 
                 if data and "comp" in str(data):
-                    self.comp.emit(float(re.findall(r"[-+]?\d*\.\d+|\d+", str(data))[0]))
+                    if "?" in str(data):
+                        client.send(str(self.parent.comp_spin.value()))
+                    else:
+                        self.comp.emit(float(re.findall(r"[-+]?\d*\.\d+|\d+", str(data))[0]))
                 if data and "amp" in str(data):
-                    self.amp.emit(float(re.findall(r"[-+]?\d*\.\d+|\d+", str(data))[0]))
+                    if "?" in str(data):
+                        client.send(str(self.parent.amp_spin.value()))
+                    else:
+                        self.amp.emit(float(re.findall(r"[-+]?\d*\.\d+|\d+", str(data))[0]))
                 if data and "const" in str(data):
-                    self.const.emit(float(re.findall(r"[-+]?\d*\.\d+|\d+", str(data))[0]))
+                    if "?" in str(data):
+                        client.send(str(self.parent.decay_spin.value()))
+                    else:
+                        self.const.emit(float(re.findall(r"[-+]?\d*\.\d+|\d+", str(data))[0]))
                 if data and "file" in str(data):
-                    data = str(data,'utf-8').replace(" ","")
-                    self.fn.emit(data.replace("file",""))
+                    if "?" in str(data):
+                        client.send(str(self.parent.filename))
+                    else:
+                        data = str(data,'utf-8').replace(" ","")
+                        self.fn.emit(data.replace("file",""))
                 if data and "toggle" in str(data):
                     if "1" in str(data):
                         self.toggle.emit(1)
@@ -104,8 +117,10 @@ class SignalServer(QtCore.QObject):
                 else:
                     raise Exception('Client disconnected')
 
+                client.shutdown()
                 client.close()
             except BaseException:
+                client.shutdown()
                 client.close()
                 return False
 
@@ -137,13 +152,14 @@ class Flippr(QtWidgets.QMainWindow, Ui_Flippr):
         self.pulseOutput.setGeometry(QtCore.QRect(410, 10, 211, 161))
         self.pulseOutput.setObjectName("pulseOutput")
 
+        self.interrupted = 0
         self.running = 0  # Important state flag, 0 = flipper off, 1 = flipper on. This
         # should ONLY be adjusted by the onoff() function
 
         self.on_button.clicked.connect(self.onoff)
 
         # Set up TCPIP server to recieve OpenGENIE commands
-        self.server = SignalServer('', 80)
+        self.server = SignalServer('', 80, self)
         self.serverThread = QtCore.QThread()
         self.server.moveToThread(self.serverThread)
 
@@ -159,6 +175,34 @@ class Flippr(QtWidgets.QMainWindow, Ui_Flippr):
         # Waveform filename, no file if filename=""
 
         self.filename=""
+
+        # We use ReadbackTask() to monitor if the beam drops. As we write 'amplitude' at the end
+        # of our waveforms, we would default to constant, high current when the timing signal cuts.
+        #
+        # The following timer in addition to the 'EveryNCallback' in ReadbackTask() keeps track of
+        # how long since the last timing signal fired. If it's greater than 5 seconds, we interrupt.
+        # When this interval again drops below 5 seconds (i.e. as soon as the beam comes back) we start
+        # flipping again.
+
+        self.rtask = ReadbackTask()  # Read task for diagnostics
+        self.rtask.StartTask()
+
+        self.timeoutClock = QtCore.QTimer(self)
+        self.timeoutClock.setInterval(1000)
+
+        def timeout():
+            time = time()
+
+            if (self.running == 1) and (np.abs(time - self.rtask.time) > 5):
+                self.off()
+                self.interrupted = 1
+            
+            if (self.running == 0) and (self.interrupted == 1) and (np.abs(time - self.rtask.time) < 5):
+                self.on()
+                self.interrupted = 0
+        
+        self.timeoutClock.timeout.connect(timeout)
+        self.timeoutClock.start()
 
     ##########################
     # OpenGENIE signal slots #
@@ -241,25 +285,13 @@ class Flippr(QtWidgets.QMainWindow, Ui_Flippr):
             self.pulseOutput.plot_figure(
                 np.arange(len(self.atask.write)), self.atask.write)
 
-            self.rtask = ReadbackTask()  # Read task for diagnostics
-
             self.atask.StartTask()
-            self.rtask.StartTask()
-
+            
             #########################################
             # Hook up some purely cosmetic UI stuff #
             #########################################
 
             self.running_indicator.setText("RUNNING")
-
-            def updateUi():
-                self.freq_lineedit.setText(str(round(self.rtask.freq, 3)))
-                self.missed_lineedit.setText(str(self.rtask.missed))
-
-            self.uiClock = QtCore.QTimer(self)
-            self.uiClock.setInterval(1000)
-            self.uiClock.timeout.connect(updateUi)
-            self.uiClock.start()
 
             self.running = 1
         else:
@@ -268,9 +300,7 @@ class Flippr(QtWidgets.QMainWindow, Ui_Flippr):
     def off(self):
         if self.running == 1:
             self.atask.ClearTask()
-            self.rtask.ClearTask()
 
-            self.uiClock.stop()
             self.running_indicator.setText("NOT RUNNING")
 
             ZeroOutput()
@@ -281,7 +311,6 @@ class Flippr(QtWidgets.QMainWindow, Ui_Flippr):
 
     def onoff(self):
         if self.running == 0:
-
             ############################
             # Set up compensation coil #
             ############################
@@ -302,32 +331,18 @@ class Flippr(QtWidgets.QMainWindow, Ui_Flippr):
             self.pulseOutput.plot_figure(
                 np.arange(len(self.atask.write)), self.atask.write)
 
-            self.rtask = ReadbackTask()  # Read task for diagnostics
-
             self.atask.StartTask()
-            self.rtask.StartTask()
-
+            
             #########################################
             # Hook up some purely cosmetic UI stuff #
             #########################################
 
             self.running_indicator.setText("RUNNING")
 
-            def updateUi():
-                self.freq_lineedit.setText(str(round(self.rtask.freq, 3)))
-                self.missed_lineedit.setText(str(self.rtask.missed))
-
-            self.uiClock = QtCore.QTimer(self)
-            self.uiClock.setInterval(1000)
-            self.uiClock.timeout.connect(updateUi)
-            self.uiClock.start()
-
             self.running = 1
         else:
             self.atask.ClearTask()
-            self.rtask.ClearTask()
 
-            self.uiClock.stop()
             self.running_indicator.setText("NOT RUNNING")
 
             ZeroOutput()
