@@ -88,22 +88,22 @@ class SignalServer(QtCore.QObject):
 
                 if data and "comp" in str(data):
                     if "?" in str(data):
-                        client.send(str(self.parent.comp_spin.value()))
+                        client.send(str(self.parent.comp_spin.value()).encode('utf-8'))
                     else:
                         self.comp.emit(float(re.findall(r"[-+]?\d*\.\d+|\d+", str(data))[0]))
                 if data and "amp" in str(data):
                     if "?" in str(data):
-                        client.send(str(self.parent.amp_spin.value()))
+                        client.send(str(self.parent.amp_spin.value()).encode('utf-8'))
                     else:
                         self.amp.emit(float(re.findall(r"[-+]?\d*\.\d+|\d+", str(data))[0]))
                 if data and "const" in str(data):
                     if "?" in str(data):
-                        client.send(str(self.parent.decay_spin.value()))
+                        client.send(str(self.parent.decay_spin.value()).encode('utf-8'))
                     else:
                         self.const.emit(float(re.findall(r"[-+]?\d*\.\d+|\d+", str(data))[0]))
                 if data and "file" in str(data):
                     if "?" in str(data):
-                        client.send(str(self.parent.filename))
+                        client.send(str(self.parent.filename).encode('utf-8'))
                     else:
                         data = str(data,'utf-8').replace(" ","")
                         self.fn.emit(data.replace("file",""))
@@ -117,10 +117,10 @@ class SignalServer(QtCore.QObject):
                 else:
                     raise Exception('Client disconnected')
 
-                client.shutdown()
+                client.shutdown(socket.SHUT_RDWR)
                 client.close()
             except BaseException:
-                client.shutdown()
+                client.shutdown(socket.SHUT_RDWR)
                 client.close()
                 return False
 
@@ -191,13 +191,13 @@ class Flippr(QtWidgets.QMainWindow, Ui_Flippr):
         self.timeoutClock.setInterval(1000)
 
         def timeout():
-            time = time()
+            t = time()
 
-            if (self.running == 1) and (np.abs(time - self.rtask.time) > 5):
+            if (self.running == 1) and (np.abs(t - self.rtask.time) > 5):
                 self.off()
                 self.interrupted = 1
             
-            if (self.running == 0) and (self.interrupted == 1) and (np.abs(time - self.rtask.time) < 5):
+            if (self.running == 0) and (self.interrupted == 1) and (np.abs(t - self.rtask.time) < 5):
                 self.on()
                 self.interrupted = 0
         
