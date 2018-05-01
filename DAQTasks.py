@@ -217,11 +217,11 @@ class ReadbackTask(Task):
     def EveryNCallback(self):
         # Read the data out of the buffer
         read = int32()
-        self.ReadAnalogF64(int(50e3),
+        self.ReadAnalogF64(int(50),
                            10,
                            DAQmx_Val_GroupByScanNumber,  # pylint: disable=E0602
                            self.data,
-                           int(50e3),
+                           int(50),
                            read,
                            None)
 
